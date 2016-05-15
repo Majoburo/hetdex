@@ -8,13 +8,21 @@ import h5py
 from integrate import get_flux
 import sys
 import os
+import os.path as op
 from scipy import interpolate
 ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 
-sdss_fits_fname = 'offsets/ifuPos.txt'
+sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 ifuPos = 'offsets/ifuPos.txt'
-ra0,dec0 = np.loadtxt(ifuPos)
+f = open(ifuPos,'r')
+f.readline()
+f.readline()
+ra0 , dec0 = [],[]
+for line in f:
+    a,b = line.split()
+    ra0.append(float(a))
+    dec0.append(float(b))
 
 
 
@@ -39,7 +47,7 @@ def optimizelin(vifu,dssifu):
    # o o x o o -> and so on...
    # o o o o o ->
    # o o o o o ->
-   (sdss_fits_fname,fiber_ra,fiber_dec,fiber_dia,zoom_factor,errors=False)
+#   (sdss_fits_fname,fiber_ra,fiber_dec,fiber_dia,zoom_factor,errors=False)
    steps = 5
    ddec=0.01
    dra=0.01
@@ -50,7 +58,7 @@ def optimizelin(vifu,dssifu):
        for s2 in range(steps):
            phi=phi+dra #step in phi
            print theta,phi
-           dssifu,edssifu = get_flux(phi,theta) #calling function that given an ra and dec will give u flux in sloan image centered there
+           dssifu,edssifu = get_flux(sdss_fits_fname,phi,theta,1,1) #calling function that given an ra and dec will give u flux in sloan image centered there
            chi2list = [chi2(vifu,dssifu),phi,theta]
        chi2,phi,theta=np.amin(chi2list,0)
     #optimizelin()
@@ -103,20 +111,33 @@ def getsdssimage():
 def parseargs():
     #options parser
     parser = OptionParser()
-    parser.add_option("-f", dest="filename",action="store",
-                              help="fits FILE to extract spectra from")
+    parser.add_option("-base", dest="basename",action="store",
+                              help="basename of fits FILEs to extract spectra from")
     parser.add_option("--xmin",dest ="xmin",default=4800.13,type=float, help="xmin value (in A)")
     parser.add_option("--xmax",dest ="xmax",default=5469.87,type=float, help="xmax value (in A)")
 
     (options, args) = parser.parse_args()
-    
-    return options
 
-def getfitsdata(options):
+    if options.basename is None:
+        msg = 'The base name was not provided'
+        parser.error(msg)
+    else:
+        hdulist = []
+        searchname = args.basename + '*.fits'
+        filenames = glob.glob(searchname)
+        if not filenames:
+            msg = 'No files found searching for: {:s}'.format(searchname)
+            parser.error(msg)
+        else:
+            for i in xrange(len(filenames)):
+                hdulist[i]= pyfits.open(filenames[i])
+#for now running only for one ifu
+    return hdulist[0]
+
+def getfitsdata(hdulist):
     #gets data fits file and returns wavelenght range plus the data (it assumes it's in log scale and changes it back)
 
-    
-    hdulist = pyfits.open(options.filename)
+  #  for i in hdulist[:,0]:
     data = hdulist[0].data
     xmin= np.exp(hdulist[0].header['CRVAL1'])
     xdelta= hdulist[0].header['CDELT1']
@@ -128,8 +149,8 @@ def getfitsdata(options):
 
 
 def main():
-    options = parseargs()
-    data,x = getfitsdata(options)
+    hdulist = parseargs()
+    data,x = getfitsdata(hdulist)
     #getsdssimage()
 
     wdata = weigthspectra(data,x)
