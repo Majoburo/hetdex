@@ -1,15 +1,15 @@
 from astropy.io import fits
 from astropy import wcs
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.ndimage.interpolation import map_coordinates,zoom
+#import matplotlib.pyplot as plt
+from scipy.ndimage.interpolation import zoom
 
 '''
 Given a fits image and fiber positions and diameters,
 this function will return the integrated flux through each fiber.
 
 '''
-def get_flux(sdss_fits_fname,fiber_ra,fiber_dec,fiber_dia,zoom_factor,errors=False) :
+def get_flux(sdss_fits_fname,fiber_ra,fiber_dec,fiber_dia,zoom_factor=1,errors=False) :
 
     with fits.open(sdss_fits_fname) as h:
         img_data = h[0].data
