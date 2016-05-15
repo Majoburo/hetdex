@@ -50,7 +50,7 @@ def get_flux(sdss_fits_fname,fiber_ra,fiber_dec,fiber_dia,zoom_factor,errors=Fal
     else: return fibsum
 
 if __name__ == '__main__':
-    with open('../greg/ifuPos.txt','r') as f:
+    with open('./offsets/ifuPos.txt','r') as f:
         f.readline()
         fiber_dia = float(f.readline())
         fiber_ra , fiber_dec = [],[]
@@ -59,4 +59,4 @@ if __name__ == '__main__':
             fiber_ra.append(float(a))
             fiber_dec.append(float(b))
     print("Flux at the first 30 fibers: ")
-    print(get_flux("sdss2.fits",fiber_ra[:30],fiber_dec[:30],fiber_dia,zoom_factor=5,errors=True))
+    print(get_flux("imaging/frame-g-002326-3-0078.fits",fiber_ra,fiber_dec,fiber_dia,zoom_factor=1,errors=False))
