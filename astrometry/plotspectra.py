@@ -30,6 +30,21 @@ def weigthspectra(data,x):
         j=j+1
     return fdata
 
+def getsdssimage(ra0,dec0):
+
+    f = open('ifuPos.txt','w')
+    f.readline()
+    ra0,dec0 = f.readline().split()
+    f.close()
+    import pyds9
+    ds9 = pyds9.DS9()
+    ds9.set('dsseso size %f %f degrees' % (40./60., 40./60.))
+    ds9.set('frame delete all')
+    ds9.set('frame new')
+    ds9.set('dsseso coord %f %f degrees' % (ra0, dec0))
+    ds9.set('dsseso close')
+    ds9.save('sdss2.fits')
+
 def parseargs():
     #options parser
     parser = OptionParser()
@@ -59,6 +74,7 @@ def getdata(options):
 def main():
     options = parseargs()
     data,x = getdata(options)
+    getsdssimage()
 
     print weigthspectra(data,x)
 if __name__ == "__main__":
