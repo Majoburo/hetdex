@@ -5,13 +5,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from optparse import OptionParser
 import h5py
-
+from integrate import get_flux
 import sys
 import os
 from scipy import interpolate
 ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 
+sdss_fits_fname = 'offsets/ifuPos.txt'
+ifuPos = 'offsets/ifuPos.txt'
+ra0,dec0 = np.loadtxt(ifuPos)
 
 
 
@@ -36,11 +39,10 @@ def optimizelin(vifu,dssifu):
    # o o x o o -> and so on...
    # o o o o o ->
    # o o o o o ->
-   
+   (sdss_fits_fname,fiber_ra,fiber_dec,fiber_dia,zoom_factor,errors=False)
    steps = 5
    ddec=0.01
    dra=0.01
-   ra0,dec0 = np.loadtxt('offsets/ifuPos.txt')
    theta=dec0-ddec*steps/2 #min value of theta to scan
    for s1 in range(steps):
        theta=theta+ddec #step in theta
@@ -48,9 +50,9 @@ def optimizelin(vifu,dssifu):
        for s2 in range(steps):
            phi=phi+dra #step in phi
            print theta,phi
-            #dssifu,edssifu=getflux(phi,theta) #calling function that given an ra and dec will give u flux in sloan image centered there
+           dssifu,edssifu = get_flux(phi,theta) #calling function that given an ra and dec will give u flux in sloan image centered there
            chi2list = [chi2(vifu,dssifu),phi,theta]
-    chi2,phi,theta=np.amin(chi2list,0)
+       chi2,phi,theta=np.amin(chi2list,0)
     #optimizelin()
     #with  phi theta as new centers repeat
     #optimizelin()
@@ -83,18 +85,18 @@ def weigthspectra(data,x):
         j=j+1
     return wdata
 
-def getsdssimage(ra0,dec0):
+def getsdssimage():
 
-    f = open('offsets/ifuPos.txt','r')
+    f = open(ifuPos,'r')
     f.readline()
-    ra0,dec0 = f.readline().split()
+    ra,dec = f.readline().split()
     f.close()
     import pyds9
     ds9 = pyds9.DS9()
     ds9.set('dsseso size %f %f degrees' % (40./60., 40./60.))
     ds9.set('frame delete all')
     ds9.set('frame new')
-    ds9.set('dsseso coord %f %f degrees' % (ra0, dec0))
+    ds9.set('dsseso coord %f %f degrees' % (ra, dec))
     ds9.set('dsseso close')
     ds9.save('sdss2.fits')
 
