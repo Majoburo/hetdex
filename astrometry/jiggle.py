@@ -13,34 +13,10 @@ ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 
 
-#global parameters
-
-j_steps=5 #jiggle steps
-
-def jiggle(shot,dra,ddec,step):
-
-   # Shots will be jiggled over a range of steps
-   # with 5 steps : (where x marks the shot center)
-   # Initial:     Movements:
-   # o o o o o -> 1 2 3 4 5
-   # o o o o o -> 6 7 8 9 10
-   # o o x o o -> and so on...
-   # o o o o o ->
-   # o o o o o ->
 
 
-    #initial jiggle parameters:
 
-
-    tshot=shot
-
-    for fiber in tshot:
-        fiber[0]=fiber[0]+dra*step
-        fiber[1]=fiber[1]+ddec*step
-    
-    return tshot
-
-def chi2(vifu,dssifu,evifu,edssifu):
+def chi2(vifu,dssifu,evifu=1,edssifu=1):
 # Evaluate chi-squared.
     chi2 = 0.0
     for n in range(len(vifu)):
@@ -52,19 +28,28 @@ def chi2(vifu,dssifu,evifu,edssifu):
 
 def optimizelin(vifu,dssifu):
 
-    steps = 5
-    ddec=0.01
-    dra=0.01
-    ra0,dec0 = np.loadtxt('offsets/ifuPos.txt')
-    theta=dec0-ddec*steps/2 #min value of theta to scan
-    for s1 in range(steps):
-        theta=theta+ddec #step in theta
-        phi=ra0-dra*steps/2 #min value of phi to scan
-        for s2 in range(steps):
-            phi=phi+dra #step in phi
-            print theta,phi
+   # Shots will be jiggled over a range of steps
+   # with 5 steps : (where x marks the shot center)
+   # Initial:     Movements:
+   # o o o o o -> 1 2 3 4 5
+   # o o o o o -> 6 7 8 9 10
+   # o o x o o -> and so on...
+   # o o o o o ->
+   # o o o o o ->
+   
+   steps = 5
+   ddec=0.01
+   dra=0.01
+   ra0,dec0 = np.loadtxt('offsets/ifuPos.txt')
+   theta=dec0-ddec*steps/2 #min value of theta to scan
+   for s1 in range(steps):
+       theta=theta+ddec #step in theta
+       phi=ra0-dra*steps/2 #min value of phi to scan
+       for s2 in range(steps):
+           phi=phi+dra #step in phi
+           print theta,phi
             #dssifu,edssifu=getflux(phi,theta) #calling function that given an ra and dec will give u flux in sloan image centered there
-            chi2list = [chi2(vifu,dssifu,evifu,edssifu),phi,theta]
+           chi2list = [chi2(vifu,dssifu),phi,theta]
     chi2,phi,theta=np.amin(chi2list,0)
     #optimizelin()
     #with  phi theta as new centers repeat
