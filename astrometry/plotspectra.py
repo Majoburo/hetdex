@@ -12,6 +12,92 @@ from scipy import interpolate
 ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 
+
+
+#class shot(object):
+#
+#    def __init__(self,ifupositions,fitsfile):
+#        self.ra0 = []
+#        self.dec0 =[]
+#    
+#    center
+#    wavelength range
+#     xmin
+#     xmax
+#    fiber
+#     flux
+#     position
+#    @classmethod
+#    def center():
+#    
+#    @classmethod
+#    def fiber(fibernumber):
+#
+#
+#    @classmethod
+#    def xrange():
+
+#global parameters
+
+j_steps=5 #jiggle steps
+
+def jiggle(shot,dra,ddec,step):
+
+   # Shots will be jiggled over a range of steps
+   # with 5 steps : (where x marks the shot center)
+   # Initial:     Movements:
+   # o o o o o -> 1 2 3 4 5
+   # o o o o o -> 6 7 8 9 10
+   # o o x o o -> and so on...
+   # o o o o o ->
+   # o o o o o ->
+
+
+    #initial jiggle parameters:
+
+
+    tshot=shot
+
+    for fiber in tshot:
+        fiber[0]=fiber[0]+dra*step
+        fiber[1]=fiber[1]+ddec*step
+    
+    return tshot
+
+def chi2(vwifu,dssifu,sigma):
+# Evaluate chi-squared.
+    chi2 = 0.0
+    for n in range(len(vwifu)):
+        residual = (vwifu[n] - dssifu[n])/(vwsigma[n]dsssigma[n])
+        chi2 = chi2 + residual*residual
+    
+    return chi2
+
+
+def optimizelin():
+
+    theta=fiber[1]-ddec*step/2 #min value of theta to scan
+    for s1 in range(j_steps):
+        theta=theta+ddec*s2 #step in theta
+        phi=fiber[0]-dra*step/2 #min value of phi to scan
+        for s2 in range(j_steps):
+            phi=phi+dra*s1 #step in phi
+            dssifu=getflux(phi,theta) #calling function that given an ra and dec will give u flux in sloan image centered there
+            chi2list=chi2(vwifu,dssifu,sigma),phi,theta
+    chi2min(chi2list)
+    #with  phi theta as new centers repeat
+    #optimizelin()
+    #when finished fit a line (or maybe every time)
+    import scipy.optimize as optimization
+    def linfun(x,a,b):
+        return a+b*x
+    optimization.curve_fit(linfun, vwifu, ddsifu,x0, sigma)
+
+
+
+    
+
+
 def weigthspectra(data,x):
     #make a weight based on some filter file and return filter spectra
     ifilter = np.loadtxt(ppath+'/filters/g_sdss.dat')
@@ -19,16 +105,16 @@ def weigthspectra(data,x):
     weight=[]
     for wavelenght in x:
         weight.append(weightf(wavelenght))
-    fdata=np.zeros((len(data[:,0]),len(x)))
+    wdata=np.zeros((len(data[:,0]),len(x)))
 
     j=0
     for fiber in data:
         i=0
         for wavelenght in x:
-            fdata[j,i]=fiber[i]*weight[i]
+            wdata[j,i]=fiber[i]*weight[i]
             i=i+1
         j=j+1
-    return fdata
+    return wdata
 
 def getsdssimage(ra0,dec0):
 
@@ -74,7 +160,7 @@ def getdata(options):
 def main():
     options = parseargs()
     data,x = getdata(options)
-    getsdssimage()
+    #getsdssimage()
 
     print weigthspectra(data,x)
 if __name__ == "__main__":
