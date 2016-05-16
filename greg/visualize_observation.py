@@ -30,6 +30,21 @@ class regioninfo(object):
         s.append("# global color=green dashlist=8 3 width=1 font=\"helvetica 8 normal roman\" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1")
         s.append("fk5")
         f.write('\n'.join(s) + "\n")
+    
+    @classmethod
+    def writeifufiberpos(cls,ifuslot,ifuside,ra,dec):
+        """Write the fiber positions for each IFU to file ``f``
+
+        Parameters
+        ----------
+        f : file-like object
+            where to write to; must have a ``write`` method
+        """
+        s = ("ifuPos%s_%s.txt" %
+                 (ifuslot,ifuside))
+        f = open(s,'a')
+        numpy.savetxt(f,[ra, dec, size])
+        f.flush()
 
     @classmethod
     def writeregion(cls, f, ra, dec, size, name):
@@ -140,6 +155,7 @@ def parse_args(argv=None):
     return args
 
     
+    
 def get_ifuslot_list(args):
     """
     Get the ifu centers and ids of the VIRUS+LRS IFUs for the adjusted fplane file.
@@ -165,15 +181,15 @@ def main():
     else:
         ra0 = args.ra[0]
         dec0 = args.dec[0]
-#        import pyds9
-#        ds9 = pyds9.DS9()
-#        ds9.set('height 1000')
-#        ds9.set('width 1200')
-#        ds9.set('dsseso size %f %f degrees' % (40./60., 40./60.))
-#        ds9.set('frame delete all')
-#        ds9.set('frame new')
-#        ds9.set('dsseso coord %f %f degrees' % (ra0, dec0))
-#        ds9.set('dsseso close')
+        import pyds9
+        ds9 = pyds9.DS9()
+        ds9.set('height 1000')
+        ds9.set('width 1200')
+        ds9.set('dsseso size %f %f degrees' % (40./60., 40./60.))
+        ds9.set('frame delete all')
+        ds9.set('frame new')
+        ds9.set('dsseso coord %f %f degrees' % (ra0, dec0))
+        ds9.set('dsseso close')
         fiberdiam = 1.5 / 2.
         if not op.exists('regions'):
             os.mkdir('regions')
@@ -189,9 +205,6 @@ def main():
         ifu_centers, ifu_id = get_ifuslot_list(args)
         fiber_center = ifc.IFUCenter('IFUcen_HETDEX.txt')
         for i in xrange(len(args.ra)):
-            f=open('ifuPos{0}{1}.txt'.format(args.ifuslot[i],args.side[i]),'w')
-            f.write("# Diameter of fibers and ra,dec positions in the sky \n")
-            f.write("{0} \n".format(fiberdiam))
             ifu_ind    = numpy.array ( [ind for ind,ifuname in enumerate(ifu_id) if ifuname == args.ifuslot[i]], dtype = numpy.int)
             rpa = numpy.pi / 180. * (args.pa[i]-180.) 
             for j in xrange(len(fiber_center.xifu[args.side[i]])):
@@ -203,19 +216,17 @@ def main():
                 ddec = dyr
                 ra_center  = args.ra[i]  + dra  # degrees
                 dec_center = args.dec[i] + ddec # degrees
- 
-                f.write("{0} {1} \n".format(ra_center[0],dec_center[0]))
-                #regioninfo.writeregion(regionfile, ra_center,dec_center,fiberdiam,
-                #                       "{:03d}".format(int(fiber_center.fib_number[args.side[i]][i])))
-            f.close()
+                regioninfo.writeregion(regionfile, ra_center,dec_center,fiberdiam,
+                                       "{:03d}".format(int(fiber_center.fib_number[args.side[i]][i])))
+                regioninfo.writeifufiberpos(args.ifuslot,args.side[i],ra_center,dec_center)
 
-        #regionfile.close()
-        #ds9.set('scale asinh')
-        #ds9.set('scale mode zmax')
-        #ds9.set('regions system wcs')
-        #ds9.set('regions sky fk5')
-        #print('Hit ENTER...')
-        #sys.stdin.readline()
+        regionfile.close()
+        ds9.set('scale asinh')
+        ds9.set('scale mode zmax')
+        ds9.set('regions system wcs')
+        ds9.set('regions sky fk5')
+        print('Hit ENTER...')
+        sys.stdin.readline()
         
 if __name__ == '__main__':
     main()
