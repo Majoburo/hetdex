@@ -15,19 +15,19 @@ from astropy.io import fits
 
 ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
-
+DEBUG = True
 sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 ifuPos = 'offsets/ifuPos075.txt'
 pixCrd = 'offsets/pixCrd.txt'
-os.environ['YODASRC'] = "/work/03237/majoburo/maverick/yoda/src"
+os.environ['YODASRC'] = "../yoda/src"
 
 def photometry():
-    cmd = "$YODASRC/yoda -P --no-kron-ap -p image.phot -M %s -A 1.89 -z 0  %s  &> /dev/null" % (pixCrd,sdss_fits_fname)
+    cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 1.8   %s " % (pixCrd,sdss_fits_fname)
     #print "> " + cmd
     os.system(cmd)
 
     dssifu=[]
-    phot=np.loadtxt('image.phot')
+    phot=np.loadtxt('imaging/image.phot')
     dssifu=[[atribute[12],atribute[13]] for atribute in phot]
     return dssifu
 
@@ -61,7 +61,7 @@ def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
 
 
 
-def jiggle(positions,virus_flux,steps = 5,ddec=0.01,dra=0.01):
+def jiggle(positions,virus_flux,steps = 5,ddec=0.001,dra=0.005):
 
    # Shots will be jiggled over a range of steps
    # with 5 steps : (where x marks the shot center)
@@ -74,7 +74,7 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.01,dra=0.01):
     chi2min=0
     ra0=np.array(positions[0])
     dec0=np.array(positions[1])
-
+    chi2pos=[]
     dectemp=dec0-ddec*steps/2 #min value of dec to scan
     for s1 in range(steps):
         ratemp=ra0-dra*steps/2 #min value of ra to scan
@@ -83,14 +83,21 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.01,dra=0.01):
             wcs2pix(ratemp,dectemp)
             dssifu = photometry()
             dss_flux = np.array(dssifu)[:,0]
-
+            '''
+            For debugging purposes and due to normalization problems, i'll compare photometry of in sdss itself
+            '''
+            print dss_flux
+            virus_flux = dss_flux
             chi2 = findchi2(virus_flux,dss_flux)
 
-            if (chi2min == 0):
-                chi2min = [chi2,ratemp,dectemp,dss_flux]
-            elif (chi2min[0] > chi2):
-                chi2min = [chi2,ratemp,dectemp,dss_flux]
+            np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
            
+            if (chi2min == 0):
+                chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
+            elif (chi2min[0] > chi2):
+                chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
+
+
             ratemp=ratemp+dra #step in ra
         dectemp=dectemp+ddec #step in theta
           
@@ -182,7 +189,6 @@ def wavelenghtrange(hdulist):
     OUTPUT:
         x = [Wavelength range]
     """
-  #  for i in hdulist[:,0]:
     xmin = hdulist.header['CRVAL1']
     xdelta = hdulist.header['CDELT1']
     x_range = hdulist.header['NAXIS1']
@@ -202,13 +208,18 @@ def main():
     data = [spectra for fitsfile in fitsfiles for spectra in fitsfile.data]
     wdata = weigthspectra(data,wl)
     virus_flux = [x.sum() for x in data]
+    #print np.sum(virus_flux)
+
 
     'Handeling imaging data'
   #  getsdssimage()
     positions = getifuPos(ifuPos)
    #   for i in range(4)
-    dss_flux = jiggle(positions,virus_flux)[3]
-    plt.plot(virus_flux,dss_flux)
-    plt.show()
+    jiggled_data_min = jiggle(positions,virus_flux)
+    
+    np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))
+    dss_flux = jiggled_data_min[3]
+#    plt.scatter(virus_flux,dss_flux)
+#    plt.show()
 if __name__ == "__main__":
     main()
