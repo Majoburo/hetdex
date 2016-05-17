@@ -47,8 +47,6 @@ def wcs2pix(sdss_fits_fname,fiber_ra,fiber_dec):
         w = wcs.WCS(h[0].header)
     pixcrd = w.wcs_world2pix(np.array(zip(fiber_ra,fiber_dec),dtype='float64'),1)
     np.savetxt("pixcrd.txt",pixcrd)
-    plt.scatter(pixcrd[:,0],pixcrd[:,1])
-    plt.show()
 
 def optimizelin(vifu,dssifu):
 
@@ -192,8 +190,7 @@ def main():
             a,b,c,d = line.split()
             fiber_ra.append(float(a))
             fiber_dec.append(float(b))
-    print("Flux at the first 30 fibers: ")
-    wcs2pix(sdss_fits_fname,fiber_ra[:30],fiber_dec[:30])
+    wcs2pix(sdss_fits_fname,fiber_ra,fiber_dec)
 
     #print wdata.shape,len(vifu)
 

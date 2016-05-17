@@ -205,7 +205,7 @@ def main():
        
         print("Creating ifuPos*.txt file")
         ifuPos = open("ifuPos%s.txt" %(args.ifuslot[0]),'w')
-        
+
         ifu_centers, ifu_id = get_ifuslot_list(args)
         fiber_center = ifc.IFUCenter('IFUcen_HETDEX.txt')
         for i in xrange(len(args.ra)):
