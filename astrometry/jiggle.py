@@ -8,19 +8,23 @@ import h5py
 from integrate import get_flux
 import sys
 import os
+import glob
 import os.path as op
 from scipy import interpolate
+from astropy import wcs
+from astropy.io import fits
+
 ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 
 sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
-ifuPos = 'offsets/ifuPos.txt'
+ifuPos = 'offsets/ifuPos075.txt'
 f = open(ifuPos,'r')
 f.readline()
 f.readline()
 ra0 , dec0 = [],[]
 for line in f:
-    a,b = line.split()
+    a,b,diameter,throughput = line.split()
     ra0.append(float(a))
     dec0.append(float(b))
 
@@ -31,11 +35,20 @@ def chi2(vifu,dssifu,evifu=1,edssifu=1):
 # Evaluate chi-squared.
     chi2 = 0.0
     for n in range(len(vifu)):
-        residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n])
+        residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n]) #is this right???
         chi2 = chi2 + residual*residual
     
     return chi2
 
+def wcs2pix(sdss_fits_fname,fiber_ra,fiber_dec):
+
+    with fits.open(sdss_fits_fname) as h:
+        img_data = h[0].data
+        w = wcs.WCS(h[0].header)
+    pixcrd = w.wcs_world2pix(np.array(zip(fiber_ra,fiber_dec),dtype='float64'),1)
+    np.savetxt("pixcrd.txt",pixcrd)
+    plt.scatter(pixcrd[:,0],pixcrd[:,1])
+    plt.show()
 
 def optimizelin(vifu,dssifu):
 
@@ -47,7 +60,6 @@ def optimizelin(vifu,dssifu):
    # o o x o o -> and so on...
    # o o o o o ->
    # o o o o o ->
-#   (sdss_fits_fname,fiber_ra,fiber_dec,fiber_dia,zoom_factor,errors=False)
    steps = 5
    ddec=0.01
    dra=0.01
@@ -82,7 +94,7 @@ def weigthspectra(data,x):
     weight=[]
     for wavelenght in x:
         weight.append(weightf(wavelenght))
-    wdata=np.zeros((len(data[:,0]),len(x)))
+    wdata=np.zeros((len(data),len(x)))
 
     j=0
     for fiber in data:
@@ -109,9 +121,16 @@ def getsdssimage():
     ds9.save('sdss2.fits')
 
 def parseargs():
-    #options parser
+    '''
+    Options parser
+    '''
     parser = OptionParser()
-    parser.add_option("-base", dest="basename",action="store",
+
+    description = "Calculate astrometry based on Imaging"
+
+
+
+    parser.add_option("--base", dest="basename",action="store",
                               help="basename of fits FILEs to extract spectra from")
     parser.add_option("--xmin",dest ="xmin",default=4800.13,type=float, help="xmin value (in A)")
     parser.add_option("--xmax",dest ="xmax",default=5469.87,type=float, help="xmax value (in A)")
@@ -122,39 +141,61 @@ def parseargs():
         msg = 'The base name was not provided'
         parser.error(msg)
     else:
-        hdulist = []
-        searchname = args.basename + '*.fits'
+
+        fitsfiles = []
+        searchname = options.basename + '*.fits'
         filenames = glob.glob(searchname)
         if not filenames:
             msg = 'No files found searching for: {:s}'.format(searchname)
             parser.error(msg)
         else:
-            for i in xrange(len(filenames)):
-                hdulist[i]= pyfits.open(filenames[i])
-#for now running only for one ifu
-    return hdulist[0]
+            fitsfiles = [pyfits.open(filenames[i])[0] for i in xrange(len(filenames))] 
+    
+    return fitsfiles
 
-def getfitsdata(hdulist):
-    #gets data fits file and returns wavelenght range plus the data (it assumes it's in log scale and changes it back)
+def wavelenghtrange(hdulist):
+    """
+    INPUT:
+        Fits file
 
+    OUTPUT:
+        x = [Wavelength range]
+    """
   #  for i in hdulist[:,0]:
-    data = hdulist[0].data
-    xmin= np.exp(hdulist[0].header['CRVAL1'])
-    xdelta= hdulist[0].header['CDELT1']
-    x_range= hdulist[0].header['NAXIS1']
-    xmax=xmin*np.exp(x_range*xdelta)
-    x = np.linspace(xmin,xmax,x_range)
-    hdulist.close()
-    return data,x
+    xmin = hdulist.header['CRVAL1']
+    xdelta = hdulist.header['CDELT1']
+    x_range = hdulist.header['NAXIS1']
+    xmax = xmin + x_range*xdelta
+    wl = np.linspace(xmin,xmax,x_range)
+    return wl
 
 
 def main():
-    hdulist = parseargs()
-    data,x = getfitsdata(hdulist)
+
+    fitsfiles = parseargs()
+    '''
+    wl = wavelenghtrange(fitsfiles[0])
+    
+    'Handeling spectral data from IFU'
+    data=[]
+    data = [spectra for fitsfile in fitsfiles for spectra in fitsfile.data]
+    wdata = weigthspectra(data,wl)
+    vifu = [x.sum() for x in data]
+   '''
+
+    'Handeling imaging data'
     #getsdssimage()
 
-    wdata = weigthspectra(data,x)
-    vifu = [x.sum() for x in data]
-    print data.shape,len(vifu)
+    with open(ifuPos,'r') as f:
+        fiber_ra , fiber_dec = [],[]
+        for line in f:
+            a,b,c,d = line.split()
+            fiber_ra.append(float(a))
+            fiber_dec.append(float(b))
+    print("Flux at the first 30 fibers: ")
+    wcs2pix(sdss_fits_fname,fiber_ra[:30],fiber_dec[:30])
+
+    #print wdata.shape,len(vifu)
+
 if __name__ == "__main__":
     main()
