@@ -19,7 +19,7 @@ DEBUG = True
 sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 ifuPos = 'offsets/ifuPos075.txt'
 pixCrd = 'offsets/pixCrd.txt'
-os.environ['YODASRC'] = "../../yoda/src"
+#os.environ['YODASRC'] = "../../yoda/src"
 
 def photometry():
     cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s &> /dev/null" % (pixCrd,sdss_fits_fname)

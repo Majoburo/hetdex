@@ -1,5 +1,18 @@
 To run jiggles:
 
+First install yoda:
+svn co svn://luna.mpe.mpg.de/yoda/trunk yoda
+cd yoda
+./bootstrap
+./configure
+make
+
+Then make an environment variable for it:
+
+export YODASRC="your_path_to_yoda/yoda/src"
+
+Then:
+
 $ . runjiggles.sh
 
 Disclaimer:
