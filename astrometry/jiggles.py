@@ -22,7 +22,7 @@ pixCrd = 'offsets/pixCrd.txt'
 os.environ['YODASRC'] = "../../yoda/src"
 
 def photometry():
-    cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s " % (pixCrd,sdss_fits_fname)
+    cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s &> /dev/null" % (pixCrd,sdss_fits_fname)
     #print "> " + cmd
     os.system(cmd)
 
@@ -80,7 +80,7 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.001000,dra=0.001000):
     For debugging purposes and due to normalization problems, i'll compare photometry of in sdss itself
     '''
 ### This starts debbuging
-    print ra0[0],dec0[0]
+    #print ra0[0],dec0[0]
     wcs2pix(ra0,dec0)
     dssifu = photometry()
     virus_flux = np.array(dssifu)[:,0]
@@ -96,16 +96,16 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.001000,dra=0.001000):
             wcs2pix(ratemp,dectemp)
             dssifu = photometry()
             dss_flux = np.array(dssifu)[:,0]
-            print ratemp[0],dectemp[0]
+            #print ratemp[0],dectemp[0]
             #print dss_flux.sum()
             chi2 = findchi2(virus_flux,dss_flux)
 
             np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
-            print('chi2 = %f, virus_flux = %f,dss_flux= %f'%(chi2,virus_flux.sum(),dss_flux.sum()))
+            #print('chi2 = %f, virus_flux = %f,dss_flux= %f'%(chi2,virus_flux.sum(),dss_flux.sum()))
             
             if (chi2min[0] > chi2):
                 chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
-                print('chi2min = %f'%(chi2min[0]))
+                #print('chi2min = %f'%(chi2min[0]))
             axarr[s1, s2].scatter(virus_flux,dss_flux)
             axarr[s1, s2].set_title('offset %d %d'%(s1,s2))
            # axarr[s1, s2].axis(xmin=-0.1,xmax=0.1,ymax=0.5,ymin=-0.5)
@@ -227,7 +227,7 @@ def main():
     positions = getifuPos(ifuPos)
    #   for i in range(4)
     jiggled_data_min = jiggle(positions,virus_flux)
-
+    print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
     np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))
     dss_flux = jiggled_data_min[3]
 
