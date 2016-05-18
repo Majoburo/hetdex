@@ -49,6 +49,9 @@ def findchi2(vifu,dssifu,evifu=1,edssifu=1):
 
 def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
 
+    '''
+        Convert ra and dec of fibers into pixels on fits file
+    '''
     with fits.open(fitsfile) as h:
         img_data = h[0].data
         w = wcs.WCS(h[0].header)
