@@ -19,10 +19,19 @@ sys.path.append(ppath)
 sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 ifuPos = 'offsets/ifuPos075.txt'
 pixCrd = 'offsets/pixCrd.txt'
-os.environ['YODASRC'] = "/work/03237/majoburo/maverick/yoda/src"
+#os.environ['YODASRC'] = "/work/03237/majoburo/maverick/yoda/src"
 
 def photometry():
-    cmd = "$YODASRC/yoda -P --no-kron-ap -p image.phot -M %s -A 1.89 -z 0  %s  &> /dev/null" % (pixCrd,sdss_fits_fname)
+
+    '''
+    Calling YODA to do photometry on the fibers.
+    
+    Parameters:
+        - A: pixel diameter of the fibers. Hetdex has fibers of 2.5 arsec, this converts in pixel space roughly to 5 pixels.
+
+    '''
+
+    cmd = "$YODASRC/yoda -P --no-kron-ap -p image.phot -M %s -A 5 -z 0  %s &> /dev/null " % (pixCrd,sdss_fits_fname)
     #print "> " + cmd
     os.system(cmd)
 
@@ -33,13 +42,22 @@ def photometry():
 
 def getifuPos(ifuPos):
 
+    '''
+    Getting ifu positions for all the fibers in one ifu. The input file is created by greg's program.
+
+    '''
+
     f = np.loadtxt(ifuPos)
     positions=[f[:,0].tolist(),f[:,1].tolist()]
     return  positions
 
 
 def findchi2(vifu,dssifu,evifu=1,edssifu=1):
-# Evaluate chi-squared.
+
+    '''
+    Evaluate chi-squared between two distributions.
+    '''
+    
     chi2 = 0.0
     for n in range(len(vifu)):
         #residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n]) #is this right???
@@ -50,6 +68,10 @@ def findchi2(vifu,dssifu,evifu=1,edssifu=1):
 
 def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
 
+    '''
+    Converting ra and dec into pixels (mainly to fit yoda's input)
+
+    '''
     with fits.open(fitsfile) as h:
         img_data = h[0].data
         w = wcs.WCS(h[0].header)
@@ -62,15 +84,19 @@ def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
 
 
 def jiggle(positions,virus_flux,steps = 5,ddec=0.01,dra=0.01):
+    '''
+    Routine that jiggle the ifu and calculates the minimun displacement
 
-   # Shots will be jiggled over a range of steps
-   # with 5 steps : (where x marks the shot center)
-   # Initial:     Movements:
-   # o o o o o -> 1 2 3 4 5
-   # o o o o o -> 6 7 8 9 10
-   # o o x o o -> and so on...
-   # o o o o o ->
-   # o o o o o ->
+    Shots will be jiggled over a range of steps
+    with 5 steps : (where x marks the shot center)
+    Initial:     Movements:
+    o o o o o -> 1 2 3 4 5
+    o o o o o -> 6 7 8 9 10
+    o o x o o -> and so on...
+    o o o o o ->
+    o o o o o ->
+    '''
+    
     chi2min=0
     ra0=np.array(positions[0])
     dec0=np.array(positions[1])
@@ -109,7 +135,9 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.01,dra=0.01):
     return chi2min
 
 def weigthspectra(data,x):
-    #make a weight based on some filter file and return filter spectra
+    '''
+    Make a weight based on some filter file and return filter spectra
+    '''
     ifilter = np.loadtxt(ppath+'/filters/g_sdss.dat')
     weightf=interpolate.interp1d(ifilter[:,0],ifilter[:,1],fill_value=0,bounds_error=False)
     weight=[]
@@ -127,6 +155,9 @@ def weigthspectra(data,x):
     return wdata
 
 def getsdssimage():
+    '''
+    Get SDSS-II image for the field using ds9 tools. Will have to be replaced by a SQL query for SDSS-III DR12
+    '''
 
     f = open(ifuPos,'r')
     f.readline()

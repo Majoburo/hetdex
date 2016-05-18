@@ -1,5 +1,5 @@
 # CALL : /work/03237/majoburo/maverick/yoda/src/yoda -P --no-kron-ap -p image.phot -M offsets/pixCrd.txt -A 1.89 -z 0 imaging/frame-g-002326-3-0078.fits 
-# THIS OUTPUT WAS CREATED ON : Tue May 17 20:40:51 2016  by YODA version 1.2.7 2014-09-24
+# THIS OUTPUT WAS CREATED ON : Wed May 18 01:14:54 2016  by YODA version 1.2.7 2014-09-24
 # IMAGE : 'imaging/frame-g-002326-3-0078.fits',  COORDS-CAT : 'offsets/pixCrd.txt'
 #  ID  K-FLUX      FLUXERR     K-MAG    MAGERR X       Y       A_AP   B_AP    PA        SKY      SKYERR  FIX-FLUX    FLUXERR     FIX-MAG MAGERR FIXRADIUS   FIXSKY  SKYERR
     1  0.0000e+00  0.0000e+00   0.000   0.000 1387.11  374.99   0.000  0.000   0.000  0.0000e+00  0.0000e+00  1.0409e-02  1.0446e-01   4.956  10.895    0.94     -0.001   0.013
