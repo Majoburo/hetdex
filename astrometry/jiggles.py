@@ -19,10 +19,10 @@ DEBUG = True
 sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 ifuPos = 'offsets/ifuPos075.txt'
 pixCrd = 'offsets/pixCrd.txt'
-os.environ['YODASRC'] = "../yoda/src"
+os.environ['YODASRC'] = "../../yoda/src"
 
 def photometry():
-    cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 1.8   %s " % (pixCrd,sdss_fits_fname)
+    cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s " % (pixCrd,sdss_fits_fname)
     #print "> " + cmd
     os.system(cmd)
 
@@ -45,7 +45,6 @@ def findchi2(vifu,dssifu,evifu=1,edssifu=1):
         #residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n]) #is this right???
         residual = vifu[n] - dssifu[n] #without errors
         chi2 = chi2 + residual*residual
-    
     return chi2
 
 def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
@@ -61,7 +60,7 @@ def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
 
 
 
-def jiggle(positions,virus_flux,steps = 5,ddec=0.001,dra=0.005):
+def jiggle(positions,virus_flux,steps = 5,ddec=0.001000,dra=0.001000):
 
    # Shots will be jiggled over a range of steps
    # with 5 steps : (where x marks the shot center)
@@ -71,10 +70,24 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.001,dra=0.005):
    # o o x o o -> and so on...
    # o o o o o ->
    # o o o o o ->
-    chi2min=0
+    chi2min=[[1000000]]
     ra0=np.array(positions[0])
     dec0=np.array(positions[1])
     chi2pos=[]
+    dss_flux=[]
+
+    '''
+    For debugging purposes and due to normalization problems, i'll compare photometry of in sdss itself
+    '''
+### This starts debbuging
+    print ra0[0],dec0[0]
+    wcs2pix(ra0,dec0)
+    dssifu = photometry()
+    virus_flux = np.array(dssifu)[:,0]
+### This ends debbuging
+
+    f, axarr = plt.subplots(5, 5)
+
     dectemp=dec0-ddec*steps/2 #min value of dec to scan
     for s1 in range(steps):
         ratemp=ra0-dra*steps/2 #min value of ra to scan
@@ -83,25 +96,23 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.001,dra=0.005):
             wcs2pix(ratemp,dectemp)
             dssifu = photometry()
             dss_flux = np.array(dssifu)[:,0]
-            '''
-            For debugging purposes and due to normalization problems, i'll compare photometry of in sdss itself
-            '''
-            print dss_flux
-            virus_flux = dss_flux
+            print ratemp[0],dectemp[0]
+            #print dss_flux.sum()
             chi2 = findchi2(virus_flux,dss_flux)
 
             np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
-           
-            if (chi2min == 0):
+            print('chi2 = %f, virus_flux = %f,dss_flux= %f'%(chi2,virus_flux.sum(),dss_flux.sum()))
+            
+            if (chi2min[0] > chi2):
                 chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
-            elif (chi2min[0] > chi2):
-                chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
-
+                print('chi2min = %f'%(chi2min[0]))
+            axarr[s1, s2].scatter(virus_flux,dss_flux)
+            axarr[s1, s2].set_title('offset %d %d'%(s1,s2))
+           # axarr[s1, s2].axis(xmin=-0.1,xmax=0.1,ymax=0.5,ymin=-0.5)
 
             ratemp=ratemp+dra #step in ra
         dectemp=dectemp+ddec #step in theta
-          
-
+    plt.show()
     #dssifu = get_flux(sdss_fits_fname,phi,theta,1,1) #calling function that given an ra and dec will give u flux in sloan image centered there
     #chi2list = [chi2(vifu,dssifu),phi,theta]
     #chi2,phi,theta=np.amin(chi2list,0)
@@ -216,10 +227,9 @@ def main():
     positions = getifuPos(ifuPos)
    #   for i in range(4)
     jiggled_data_min = jiggle(positions,virus_flux)
-    
+
     np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))
     dss_flux = jiggled_data_min[3]
-#    plt.scatter(virus_flux,dss_flux)
-#    plt.show()
+
 if __name__ == "__main__":
     main()
