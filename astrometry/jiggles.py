@@ -19,7 +19,6 @@ DEBUG = True
 sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 ifuPos = 'offsets/ifuPos075.txt'
 pixCrd = 'offsets/pixCrd.txt'
-<<<<<<< HEAD:astrometry/jiggle.py
 #os.environ['YODASRC'] = "/work/03237/majoburo/maverick/yoda/src"
 
 def photometry():
@@ -32,71 +31,97 @@ def photometry():
 
     '''
 
-    cmd = "$YODASRC/yoda -P --no-kron-ap -p image.phot -M %s -A 5 -z 0  %s &> /dev/null " % (pixCrd,sdss_fits_fname)
-=======
-#os.environ['YODASRC'] = "../../yoda/src"
-
-def photometry():
     cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s &> /dev/null" % (pixCrd,sdss_fits_fname)
->>>>>>> aa90baea138e64d400737ea385397c5a95a82cd1:astrometry/jiggles.py
     #print "> " + cmd
     os.system(cmd)
 
-    dssifu=[]
-    phot=np.loadtxt('imaging/image.phot')
-    dssifu=[[atribute[12],atribute[13]] for atribute in phot]
+    dssifu= get_txt_data('imaging/image.phot',[12,13])
     return dssifu
 
-def getifuPos(ifuPos):
+def get_txt_data(txtfile,columns):
 
     '''
-    Getting ifu positions for all the fibers in one ifu. The input file is created by greg's program.
+    Get data from txt file.
+    INPUT:
+        txtfile: location of txt file (type:string)
+        columns: columns to get  (type:ints)
+
 
     '''
+    data=[]
+    f = np.loadtxt(txtfile)
+    for i in columns:
+        data.append(f[:,i])
 
-    f = np.loadtxt(ifuPos)
-    positions=[f[:,0].tolist(),f[:,1].tolist()]
-    return  positions
+    data = np.array(data)
+    return  data
 
 
-def findchi2(vifu,dssifu,evifu=1,edssifu=1):
+def findchi2(vifu,dssifu,evifu,edssifu):
 
     '''
     Evaluate chi-squared between two distributions.
     '''
-    
     chi2 = 0.0
     for n in range(len(vifu)):
-        #residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n]) #is this right???
-        residual = vifu[n] - dssifu[n] #without errors
+        residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n]) #is this right???
+        #residual = vifu[n] - dssifu[n] #without errors
         chi2 = chi2 + residual*residual
     return chi2
 
 def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
 
     '''
-<<<<<<< HEAD:astrometry/jiggle.py
     Converting ra and dec into pixels (mainly to fit yoda's input)
 
-=======
-        Convert ra and dec of fibers into pixels on fits file
->>>>>>> aa90baea138e64d400737ea385397c5a95a82cd1:astrometry/jiggles.py
     '''
     with fits.open(fitsfile) as h:
         img_data = h[0].data
         w = wcs.WCS(h[0].header)
     pixcrd = w.wcs_world2pix(np.array(zip(fiber_ra,fiber_dec),dtype='float64'),1)
+    #pixcrd = map(list,enumerate(pixcrd))
     pixcrd = [[i+1,pixcrd[i].tolist()[0],pixcrd[i].tolist()[1]] for i in range(len(pixcrd[:,0]))]
     np.savetxt(pixCrd,pixcrd)
 
     return
 
+def zoom(positions,virus_flux,zooms=10):
 
+    '''
+    Routine to zoom in the jiggles.
 
-<<<<<<< HEAD:astrometry/jiggle.py
-def jiggle(positions,virus_flux,steps = 5,ddec=0.01,dra=0.01):
+    '''
+    for z in range(zooms):
+
+        z=z+1
+        ddec=round(0.001000/z,6)
+        dra=round(0.001000/z,6)
+        chi2min = jiggle(positions,virus_flux,ddec,dra)
+        positions = np.array([chi2min[1],chi2min[2]])
+
+    return chi2min
+
+def jiggle(positions,virus_flux,ddec=0.0001000,dra=0.0001000,steps = 5):
     '''
     Routine that jiggle the ifu and calculates the minimun displacement
+
+    INPUT:
+        positions   (numpy.array[2]) Position of fibers     (units:sexagesimal)
+        virus_flux  (numpy.array[1]) Flux of each fiber in hetdex IFU.
+        steps       (int)            Steps to jiggle in.
+        ddec        (float)          Lenght of steps in dec (units:sexagesimal)
+        dra         (float)          Lenght of steps in ra  (units:sexagesimal)
+
+    OUTPUT:
+        chi2min     ([chi2,ratemp,dectemp,dss_flux,s1,s2])
+            
+            int             chi2           Minimun chi 2 computed
+            numpy.array[1]  ratemp         Ras for the fibers with min chi2
+            numpy.array[1]  dectemp        Decs for the fibers with min chi2
+            rumpy.array[1]  dss_flux       Flux for the fibers with min chi2
+            int             s1             Step in the grid of decs with min chi2
+            int             s2             Step in the grid of ras with min chi2
+
 
     Shots will be jiggled over a range of steps
     with 5 steps : (where x marks the shot center)
@@ -108,22 +133,9 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.01,dra=0.01):
     o o o o o ->
     '''
     
-    chi2min=0
-=======
-def jiggle(positions,virus_flux,steps = 5,ddec=0.001000,dra=0.001000):
-
-   # Shots will be jiggled over a range of steps
-   # with 5 steps : (where x marks the shot center)
-   # Initial:     Movements:
-   # o o o o o -> 1 2 3 4 5
-   # o o o o o -> 6 7 8 9 10
-   # o o x o o -> and so on...
-   # o o o o o ->
-   # o o o o o ->
-    chi2min=[[1000000]]
->>>>>>> aa90baea138e64d400737ea385397c5a95a82cd1:astrometry/jiggles.py
-    ra0=np.array(positions[0])
-    dec0=np.array(positions[1])
+    chi2min=[1000000]
+    ra0=positions[0]
+    dec0=positions[1]
     chi2pos=[]
     dss_flux=[]
 
@@ -134,10 +146,11 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.001000,dra=0.001000):
     #print ra0[0],dec0[0]
     wcs2pix(ra0,dec0)
     dssifu = photometry()
-    virus_flux = np.array(dssifu)[:,0]
+    virus_flux = dssifu[0]
+    evirus_flux = dssifu[1]
 ### This ends debbuging
 
-    f, axarr = plt.subplots(5, 5)
+    #f, axarr = plt.subplots(5, 5)
 
     dectemp=dec0-ddec*steps/2 #min value of dec to scan
     for s1 in range(steps):
@@ -146,24 +159,27 @@ def jiggle(positions,virus_flux,steps = 5,ddec=0.001000,dra=0.001000):
         #MAIN ROUTINE
             wcs2pix(ratemp,dectemp)
             dssifu = photometry()
-            dss_flux = np.array(dssifu)[:,0]
+            dss_flux = dssifu[0]
+            edss_flux = dssifu[1]
+
             #print ratemp[0],dectemp[0]
             #print dss_flux.sum()
-            chi2 = findchi2(virus_flux,dss_flux)
+            chi2 = findchi2(virus_flux,dss_flux,evifu=evirus_flux,edssifu=edss_flux)
 
             np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
-            #print('chi2 = %f, virus_flux = %f,dss_flux= %f'%(chi2,virus_flux.sum(),dss_flux.sum()))
+            
+            #print('chi2 = %f, virus_flux = %f,dss_flux= %f, s1=%d,s2=%d'%(chi2,virus_flux.sum(),dss_flux.sum(),s1,s2))
             
             if (chi2min[0] > chi2):
                 chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
-                #print('chi2min = %f'%(chi2min[0]))
+            '''    #print('chi2min = %f'%(chi2min[0]))
             axarr[s1, s2].scatter(virus_flux,dss_flux)
             axarr[s1, s2].set_title('offset %d %d'%(s1,s2))
-           # axarr[s1, s2].axis(xmin=-0.1,xmax=0.1,ymax=0.5,ymin=-0.5)
-
+            axarr[s1, s2].axis(xmin=-0.1,xmax=0.1,ymax=0.5,ymin=-0.5)
+            '''
             ratemp=ratemp+dra #step in ra
         dectemp=dectemp+ddec #step in theta
-    plt.show()
+    #  plt.show()
     #dssifu = get_flux(sdss_fits_fname,phi,theta,1,1) #calling function that given an ra and dec will give u flux in sloan image centered there
     #chi2list = [chi2(vifu,dssifu),phi,theta]
     #chi2,phi,theta=np.amin(chi2list,0)
@@ -279,10 +295,11 @@ def main():
 
 
     'Handeling imaging data'
-  #  getsdssimage()
-    positions = getifuPos(ifuPos)
-   #   for i in range(4)
-    jiggled_data_min = jiggle(positions,virus_flux)
+    #getsdssimage()
+
+    #Getting ifu positions for all the fibers in one ifu. The input file is created by greg's program.
+    positions = get_txt_data(ifuPos,[0,1])
+    jiggled_data_min = zoom(positions,virus_flux)
     print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
     np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))
     dss_flux = jiggled_data_min[3]
