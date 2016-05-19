@@ -1,25 +1,27 @@
 #!/usr/bin/env python
 
+from __future__ import division
 import sys
 import os
 import glob
 
+
 import pyfits
 import numpy as np
 import matplotlib.pyplot as plt
-from optparse import OptionParser
+import argparse
 import os.path as op
 from scipy import interpolate
 from astropy import wcs
 from astropy.io import fits
-
 ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 DEBUG = True
 sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
-ifuPos = 'offsets/ifuPos075.txt'
+#sdss_fits_fname = 'imaging/J134225.00+282357.0-g.fits'
 pixCrd = 'offsets/pixCrd.txt'
-#os.environ['YODASRC'] = "/work/03237/majoburo/maverick/yoda/src"
+if(os.getenv('YODASRC')==None):
+    os.environ['YODASRC'] = "/Users/majoburo/code/yoda/src"
 
 def photometry():
 
@@ -30,8 +32,8 @@ def photometry():
         - A: pixel diameter of the fibers. Hetdex has fibers of 2.5 arsec, this converts in pixel space roughly to 5 pixels.
 
     '''
-
     cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s &> /dev/null" % (pixCrd,sdss_fits_fname)
+    #cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s" % (pixCrd,sdss_fits_fname)
     #print "> " + cmd
     os.system(cmd)
 
@@ -64,6 +66,7 @@ def findchi2(vifu,dssifu,evifu,edssifu):
     '''
     chi2 = 0.0
     for n in range(len(vifu)):
+        #print('%f,%f,%f,%f'%(vifu[n],dssifu[n],evifu[n],edssifu[n]))
         residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n]) #is this right???
         #residual = vifu[n] - dssifu[n] #without errors
         chi2 = chi2 + residual*residual
@@ -101,7 +104,7 @@ def zoom(positions,virus_flux,zooms=10):
 
     return chi2min
 
-def jiggle(positions,virus_flux,ddec=0.0001000,dra=0.0001000,steps = 5):
+def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
     '''
     Routine that jiggle the ifu and calculates the minimun displacement
 
@@ -133,7 +136,7 @@ def jiggle(positions,virus_flux,ddec=0.0001000,dra=0.0001000,steps = 5):
     o o o o o ->
     '''
     
-    chi2min=[1000000]
+    chi2min=[1000000000000000000]  ##Gotta find a better way to enforce this...
     ra0=positions[0]
     dec0=positions[1]
     chi2pos=[]
@@ -163,7 +166,9 @@ def jiggle(positions,virus_flux,ddec=0.0001000,dra=0.0001000,steps = 5):
             edss_flux = dssifu[1]
 
             #print ratemp[0],dectemp[0]
+            
             #print dss_flux.sum()
+            #print virus_flux.sum()
             chi2 = findchi2(virus_flux,dss_flux,evifu=evirus_flux,edssifu=edss_flux)
 
             np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
@@ -181,12 +186,6 @@ def jiggle(positions,virus_flux,ddec=0.0001000,dra=0.0001000,steps = 5):
         dectemp=dectemp+ddec #step in theta
     #  plt.show()
     #dssifu = get_flux(sdss_fits_fname,phi,theta,1,1) #calling function that given an ra and dec will give u flux in sloan image centered there
-    #chi2list = [chi2(vifu,dssifu),phi,theta]
-    #chi2,phi,theta=np.amin(chi2list,0)
-    #optimizelin()
-    #with  phi theta as new centers repeat
-    #optimizelin()
-    #when finished fit a line (or maybe every time)
     #import scipy.optimize as optimization
     #def linfun(x,a,b):
     #    return a+b*x
@@ -231,38 +230,38 @@ def getsdssimage():
     ds9.set('dsseso close')
     ds9.save('sdss2.fits')
 
-def parseargs():
+def parseargs(argv=None):
     '''
     Options parser
     '''
-    parser = OptionParser()
+    #parser = OptionParser()
 
-    description = "Calculate astrometry based on Imaging"
+    parser = argparse.ArgumentParser(description = "Calculate astrometry based on Imaging")
 
 
-
-    parser.add_option("--base", dest="basename",action="store",
+    parser.add_argument("basename",nargs='?', type=str,action="store",
                               help="basename of fits FILEs to extract spectra from")
-    parser.add_option("--xmin",dest ="xmin",default=4800.13,type=float, help="xmin value (in A)")
-    parser.add_option("--xmax",dest ="xmax",default=5469.87,type=float, help="xmax value (in A)")
+    parser.add_argument("ifuPos",nargs='?', type=str,
+                        help='File with initial guess of ifu positions in the sky')
+    parser.add_argument("--xmin",dest ="xmin",default=4800.13,type=float, help="xmin value (in A)")
+    parser.add_argument("--xmax",dest ="xmax",default=5469.87,type=float, help="xmax value (in A)")
+    args = parser.parse_args(args=argv)
 
-    (options, args) = parser.parse_args()
-
-    if options.basename is None:
+    if args.basename is None:
         msg = 'The base name was not provided'
         parser.error(msg)
     else:
 
-        fitsfiles = []
-        searchname = options.basename + '*.fits'
+        args.fitsfiles = []
+        searchname = args.basename + '*.fits'
         filenames = glob.glob(searchname)
         if not filenames:
             msg = 'No files found searching for: {:s}'.format(searchname)
             parser.error(msg)
         else:
-            fitsfiles = [pyfits.open(filenames[i])[0] for i in xrange(len(filenames))] 
+            args.fitsfiles = [pyfits.open(filenames[i])[0] for i in xrange(len(filenames))] 
     
-    return fitsfiles
+    return args
 
 def wavelenghtrange(hdulist):
     """
@@ -281,9 +280,13 @@ def wavelenghtrange(hdulist):
 
 
 def main():
+    args = parseargs()
 
-    fitsfiles = parseargs()
-    
+    print """Jiggles BETA version"""
+
+    fitsfiles = args.fitsfiles
+  # if args.verbose:
+  #     print "Calculating wavelenght range \n"
     wl = wavelenghtrange(fitsfiles[0])
     
     'Handeling spectral data from IFU'
@@ -298,7 +301,7 @@ def main():
     #getsdssimage()
 
     #Getting ifu positions for all the fibers in one ifu. The input file is created by greg's program.
-    positions = get_txt_data(ifuPos,[0,1])
+    positions = get_txt_data(args.ifuPos,[0,1])
     jiggled_data_min = zoom(positions,virus_flux)
     print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
     np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))

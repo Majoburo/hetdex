@@ -15,6 +15,9 @@ Then:
 
 $ . runjiggles.sh
 
+Setting files:
+- ifuPos*.txt : Text file with the positions of each ifu.
+
 Disclaimer:
 
 Jiggles is in very very beta version. Pretty much a squeleton of what will be.
