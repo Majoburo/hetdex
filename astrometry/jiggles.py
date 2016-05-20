@@ -4,8 +4,8 @@ from __future__ import division
 import sys
 import os
 import glob
-
-
+import subprocess
+from telarchive import fetchsdss
 import pyfits
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,7 +21,28 @@ sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 #sdss_fits_fname = 'imaging/J134225.00+282357.0-g.fits'
 pixCrd = 'offsets/pixCrd.txt'
 if(os.getenv('YODASRC')==None):
-    os.environ['YODASRC'] = "/Users/majoburo/code/yoda/src"
+    os.environ['YODASRC'] = os.environ['WORK']+"/yoda/src"
+if(os.getenv('FETCHSDSS')==None):
+    os.environ['FETCHSDSS'] = os.environ['WORK']+"/fetchsdss"
+
+def getsdssimg(ra,dec):
+    '''
+    Getting imaging from SDSS DR12.
+    
+    INPUT:
+
+        float   ra      RA to get image from
+        float   dec     DEC to get image from
+
+    '''
+    subprocess.call([os.environ['FETCHSDSS']+'/do_fetchsdss.py',"g", "--coords=%s %s"%(ra,dec),"--nodr7","--getdr12","--nosuffix","--output=imaging/sdssDR12"])
+    cmd = "bunzip2 imaging/sdssDR12g.fits.bz2 "
+    os.system(cmd)
+    sdss_fits_fname = 'imaging/sdssD12g.fits'
+
+
+    return
+
 
 def photometry():
 
@@ -47,7 +68,8 @@ def get_txt_data(txtfile,columns):
     INPUT:
         txtfile: location of txt file (type:string)
         columns: columns to get  (type:ints)
-
+    OUTPUT:
+        np.array[2] data    [[column],[column]...]
 
     '''
     data=[]
@@ -212,7 +234,7 @@ def weigthspectra(data,x):
         j=j+1
     return wdata
 
-def getsdssimage():
+def getsdssimageold():
     '''
     Get SDSS-II image for the field using ds9 tools. Will have to be replaced by a SQL query for SDSS-III DR12
     '''
@@ -298,10 +320,10 @@ def main():
 
 
     'Handeling imaging data'
-    #getsdssimage()
 
     #Getting ifu positions for all the fibers in one ifu. The input file is created by greg's program.
     positions = get_txt_data(args.ifuPos,[0,1])
+    getsdssimg(positions[0,0],positions[1,0])
     jiggled_data_min = zoom(positions,virus_flux)
     print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
     np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))
