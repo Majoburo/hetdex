@@ -17,7 +17,8 @@ from astropy.io import fits
 ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 DEBUG = True
-sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
+sdss_fits_fname = 'imaging/sdssDR12g.fits'
+#sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
 #sdss_fits_fname = 'imaging/J134225.00+282357.0-g.fits'
 pixCrd = 'offsets/pixCrd.txt'
 if(os.getenv('YODASRC')==None):
@@ -35,11 +36,11 @@ def getsdssimg(ra,dec):
         float   dec     DEC to get image from
 
     '''
-    subprocess.call([os.environ['FETCHSDSS']+'/do_fetchsdss.py',"g", "--coords=%s %s"%(ra,dec),"--nodr7","--getdr12","--nosuffix","--output=imaging/sdssDR12"])
-    cmd = "bunzip2 imaging/sdssDR12g.fits.bz2 "
+    print "The ra, dec poisitions to search SDSS-III for imaging are: %3.6f, %2.6f"%(ra,dec)
+    #subprocess.call([os.environ['FETCHSDSS']+'/do_fetchsdss.py',"g", "--coords=%s %s"%(ra,dec),"--nodr7","--getdr12","--nosuffix","--output=imaging/sdssDR12"])
+    subprocess.call([os.environ['FETCHSDSS']+'/do_fetchsdss.py',"g","--nodr7","--getdr12","--nosuffix","--output=imaging/sdssDR12","--ref=4649 4 147"])
+    cmd = "bunzip2 imaging/sdssDR12g.fits.bz2; rm imaging/sdssDR12g.fits.bz2 "
     os.system(cmd)
-    sdss_fits_fname = 'imaging/sdssD12g.fits'
-
 
     return
 
@@ -88,13 +89,11 @@ def findchi2(vifu,dssifu,evifu,edssifu):
     '''
     chi2 = 0.0
     for n in range(len(vifu)):
-        #print('%f,%f,%f,%f'%(vifu[n],dssifu[n],evifu[n],edssifu[n]))
-        residual = (vifu[n] - dssifu[n])/(evifu[n]*edssifu[n]) #is this right???
-        #residual = vifu[n] - dssifu[n] #without errors
-        chi2 = chi2 + residual*residual
+        residual = (vifu[n] - dssifu[n]) #is this right???
+        chi2 = chi2 + residual*residual/(evifu[n]*edssifu[n])
     return chi2
 
-def wcs2pix(fiber_ra,fiber_dec,fitsfile=sdss_fits_fname):
+def wcs2pix(fiber_ra,fiber_dec,fitsfile):
 
     '''
     Converting ra and dec into pixels (mainly to fit yoda's input)
@@ -166,15 +165,16 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
 
     '''
     For debugging purposes and due to normalization problems, i'll compare photometry of in sdss itself
-    '''
+    
 ### This starts debbuging
     #print ra0[0],dec0[0]
-    wcs2pix(ra0,dec0)
+    wcs2pix(ra0,dec0,sdss_fits_fname)
     dssifu = photometry()
     virus_flux = dssifu[0]
     evirus_flux = dssifu[1]
 ### This ends debbuging
-
+    '''
+    evirus_flux = np.ones(len(virus_flux)) #just to test, without errors
     #f, axarr = plt.subplots(5, 5)
 
     dectemp=dec0-ddec*steps/2 #min value of dec to scan
@@ -182,7 +182,7 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
         ratemp=ra0-dra*steps/2 #min value of ra to scan
         for s2 in range(steps):
         #MAIN ROUTINE
-            wcs2pix(ratemp,dectemp)
+            wcs2pix(ratemp,dectemp,sdss_fits_fname)
             dssifu = photometry()
             dss_flux = dssifu[0]
             edss_flux = dssifu[1]
@@ -325,6 +325,9 @@ def main():
     positions = get_txt_data(args.ifuPos,[0,1])
     getsdssimg(positions[0,0],positions[1,0])
     jiggled_data_min = zoom(positions,virus_flux)
+    
+    print "RA is off by %3.6f"%(positions[0,0]-jiggled_data_min[1][0])
+    print "DEC is off by %2.6f"%(positions[1,0]-jiggled_data_min[2][0])
     print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
     np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))
     dss_flux = jiggled_data_min[3]
