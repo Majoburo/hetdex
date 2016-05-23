@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import os.path as op
+import tools
 from scipy import interpolate
 from astropy import wcs
 from astropy.io import fits
@@ -18,69 +19,11 @@ ppath,f = os.path.split( os.path.realpath(__file__) )
 sys.path.append(ppath)
 DEBUG = True
 sdss_fits_fname = 'imaging/sdssDR12g.fits'
-#sdss_fits_fname = 'imaging/frame-g-002326-3-0078.fits'
-#sdss_fits_fname = 'imaging/J134225.00+282357.0-g.fits'
 pixCrd = 'offsets/pixCrd.txt'
 if(os.getenv('YODASRC')==None):
     os.environ['YODASRC'] = os.environ['WORK']+"/yoda/src"
 if(os.getenv('FETCHSDSS')==None):
     os.environ['FETCHSDSS'] = os.environ['WORK']+"/fetchsdss"
-
-def getsdssimg(ra,dec):
-    '''
-    Getting imaging from SDSS DR12.
-    
-    INPUT:
-
-        float   ra      RA to get image from
-        float   dec     DEC to get image from
-
-    '''
-    print "The ra, dec poisitions to search SDSS-III for imaging are: %3.6f, %2.6f"%(ra,dec)
-    #subprocess.call([os.environ['FETCHSDSS']+'/do_fetchsdss.py',"g", "--coords=%s %s"%(ra,dec),"--nodr7","--getdr12","--nosuffix","--output=imaging/sdssDR12"])
-    subprocess.call([os.environ['FETCHSDSS']+'/do_fetchsdss.py',"g","--nodr7","--getdr12","--nosuffix","--output=imaging/sdssDR12","--ref=4649 4 147"])
-    cmd = "bunzip2 imaging/sdssDR12g.fits.bz2; rm imaging/sdssDR12g.fits.bz2 "
-    os.system(cmd)
-
-    return
-
-
-def photometry():
-
-    '''
-    Calling YODA to do photometry on the fibers.
-    
-    Parameters:
-        - A: pixel diameter of the fibers. Hetdex has fibers of 2.5 arsec, this converts in pixel space roughly to 5 pixels.
-
-    '''
-    cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s &> /dev/null" % (pixCrd,sdss_fits_fname)
-    #cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s" % (pixCrd,sdss_fits_fname)
-    #print "> " + cmd
-    os.system(cmd)
-
-    dssifu= get_txt_data('imaging/image.phot',[12,13])
-    return dssifu
-
-def get_txt_data(txtfile,columns):
-
-    '''
-    Get data from txt file.
-    INPUT:
-        txtfile: location of txt file (type:string)
-        columns: columns to get  (type:ints)
-    OUTPUT:
-        np.array[2] data    [[column],[column]...]
-
-    '''
-    data=[]
-    f = np.loadtxt(txtfile)
-    for i in columns:
-        data.append(f[:,i])
-
-    data = np.array(data)
-    return  data
-
 
 def findchi2(vifu,dssifu,evifu,edssifu):
 
@@ -89,8 +32,8 @@ def findchi2(vifu,dssifu,evifu,edssifu):
     '''
     chi2 = 0.0
     for n in range(len(vifu)):
-        residual = (vifu[n] - dssifu[n]) #is this right???
-        chi2 = chi2 + residual*residual/(evifu[n]*edssifu[n])
+        residual = (vifu[n] - dssifu[n])
+        chi2 = chi2 + residual*residual/pow((evifu[n]*edssifu[n]),0.5)
     return chi2
 
 def wcs2pix(fiber_ra,fiber_dec,fitsfile):
@@ -103,7 +46,6 @@ def wcs2pix(fiber_ra,fiber_dec,fitsfile):
         img_data = h[0].data
         w = wcs.WCS(h[0].header)
     pixcrd = w.wcs_world2pix(np.array(zip(fiber_ra,fiber_dec),dtype='float64'),1)
-    #pixcrd = map(list,enumerate(pixcrd))
     pixcrd = [[i+1,pixcrd[i].tolist()[0],pixcrd[i].tolist()[1]] for i in range(len(pixcrd[:,0]))]
     np.savetxt(pixCrd,pixcrd)
 
@@ -182,13 +124,15 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
         ratemp=ra0-dra*steps/2 #min value of ra to scan
         for s2 in range(steps):
         #MAIN ROUTINE
+            #print "For %3.6f %2.6f:"%(ratemp[0]+dra,dectemp[0]+ddec)
             wcs2pix(ratemp,dectemp,sdss_fits_fname)
-            dssifu = photometry()
+            
+            #print "     Calculating photometry."
+            dssifu = tools.photometry(pixCrd,sdss_fits_fname)
             dss_flux = dssifu[0]
             edss_flux = dssifu[1]
 
-            #print ratemp[0],dectemp[0]
-            
+            #print ratemp[0],dectemp[0]        
             #print dss_flux.sum()
             #print virus_flux.sum()
             chi2 = findchi2(virus_flux,dss_flux,evifu=evirus_flux,edssifu=edss_flux)
@@ -196,7 +140,7 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
             np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
             
             #print('chi2 = %f, virus_flux = %f,dss_flux= %f, s1=%d,s2=%d'%(chi2,virus_flux.sum(),dss_flux.sum(),s1,s2))
-            
+            print "     Searching for min chi2"
             if (chi2min[0] > chi2):
                 chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
             '''    #print('chi2min = %f'%(chi2min[0]))
@@ -206,13 +150,27 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
             '''
             ratemp=ratemp+dra #step in ra
         dectemp=dectemp+ddec #step in theta
-    #  plt.show()
-    #dssifu = get_flux(sdss_fits_fname,phi,theta,1,1) #calling function that given an ra and dec will give u flux in sloan image centered there
+    #plt.show()
     #import scipy.optimize as optimization
     #def linfun(x,a,b):
     #    return a+b*x
     #optimization.curve_fit(linfun, vifu, ifu,x0, sigma)
     return chi2min
+
+def wavelenghtrange(hdulist):
+    """
+    INPUT:
+        Fits file
+
+    OUTPUT:
+        x = [Wavelength range]
+    """
+    xmin = hdulist.header['CRVAL1']
+    xdelta = hdulist.header['CDELT1']
+    x_range = hdulist.header['NAXIS1']
+    xmax = xmin + x_range*xdelta
+    wl = np.linspace(xmin,xmax,x_range)
+    return wl
 
 def weigthspectra(data,x):
     '''
@@ -234,23 +192,6 @@ def weigthspectra(data,x):
         j=j+1
     return wdata
 
-def getsdssimageold():
-    '''
-    Get SDSS-II image for the field using ds9 tools. Will have to be replaced by a SQL query for SDSS-III DR12
-    '''
-
-    f = open(ifuPos,'r')
-    f.readline()
-    ra,dec = f.readline().split()
-    f.close()
-    import pyds9
-    ds9 = pyds9.DS9()
-    ds9.set('dsseso size %f %f degrees' % (40./60., 40./60.))
-    ds9.set('frame delete all')
-    ds9.set('frame new')
-    ds9.set('dsseso coord %f %f degrees' % (ra, dec))
-    ds9.set('dsseso close')
-    ds9.save('sdss2.fits')
 
 def parseargs(argv=None):
     '''
@@ -285,52 +226,39 @@ def parseargs(argv=None):
     
     return args
 
-def wavelenghtrange(hdulist):
-    """
-    INPUT:
-        Fits file
-
-    OUTPUT:
-        x = [Wavelength range]
-    """
-    xmin = hdulist.header['CRVAL1']
-    xdelta = hdulist.header['CDELT1']
-    x_range = hdulist.header['NAXIS1']
-    xmax = xmin + x_range*xdelta
-    wl = np.linspace(xmin,xmax,x_range)
-    return wl
 
 
 def main():
     args = parseargs()
 
-    print """Jiggles BETA version"""
+    print """Jiggles BETA version
+             --Algorithm used in VENGA astrometry--"""
 
     fitsfiles = args.fitsfiles
-  # if args.verbose:
-  #     print "Calculating wavelenght range \n"
+    print "Calculating wavelength range from virus files."
     wl = wavelenghtrange(fitsfiles[0])
     
-    'Handeling spectral data from IFU'
+    print 'Weighting spectral data from IFU using sdss g filter and integrating over wavelenght range for each fiber...'
     data=[]
     data = [spectra for fitsfile in fitsfiles for spectra in fitsfile.data]
     wdata = weigthspectra(data,wl)
     virus_flux = [x.sum() for x in data]
-    #print np.sum(virus_flux)
 
-
-    'Handeling imaging data'
+    print 'Retrieving IFU position that were created by Greg\'s visualization_tool.py.'
 
     #Getting ifu positions for all the fibers in one ifu. The input file is created by greg's program.
-    positions = get_txt_data(args.ifuPos,[0,1])
-    getsdssimg(positions[0,0],positions[1,0])
+    positions = tools.get_txt_data(args.ifuPos,[0,1])
+
+    print 'Using fetchsdss to get image data from SDSS-III DR12.'
+    tools.getsdssimg(positions[0,0],positions[1,0])
+
     jiggled_data_min = zoom(positions,virus_flux)
     
     print "RA is off by %3.6f"%(positions[0,0]-jiggled_data_min[1][0])
     print "DEC is off by %2.6f"%(positions[1,0]-jiggled_data_min[2][0])
-    print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
+    #print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
     np.savetxt('debug/jiggled_data_min_%d_%d.cat'%(jiggled_data_min[4],jiggled_data_min[5]),map(list,zip(*[jiggled_data_min[1],jiggled_data_min[2]])))
-    dss_flux = jiggled_data_min[3]
+    #dss_flux = jiggled_data_min[3]
 
 if __name__ == "__main__":
     main()
