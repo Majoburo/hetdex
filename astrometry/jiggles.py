@@ -125,7 +125,7 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
         for s2 in range(steps):
         #MAIN ROUTINE
             #print "For %3.6f %2.6f:"%(ratemp[0]+dra,dectemp[0]+ddec)
-            wcs2pix(ratemp,dectemp,sdss_fits_fname)
+            wcs2pix(ratemp,dectemp,sdss_fits_fname) #converting ra and dec to pixels in sdss image for yoda input
             
             #print "     Calculating photometry."
             dssifu = tools.photometry(pixCrd,sdss_fits_fname)
@@ -137,10 +137,10 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
             #print virus_flux.sum()
             chi2 = findchi2(virus_flux,dss_flux,evifu=evirus_flux,edssifu=edss_flux)
 
-            np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
+            #np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
             
             #print('chi2 = %f, virus_flux = %f,dss_flux= %f, s1=%d,s2=%d'%(chi2,virus_flux.sum(),dss_flux.sum(),s1,s2))
-            print "     Searching for min chi2"
+            #print "     Searching for min chi2"
             if (chi2min[0] > chi2):
                 chi2min = [chi2,ratemp,dectemp,dss_flux,s1,s2]
             '''    #print('chi2min = %f'%(chi2min[0]))

@@ -74,7 +74,7 @@ def getsdssimg(ra,dec):
     ds9.set('frame new')
     ds9.set('fits imaging/sdssDR12g.fits')
     ds9.set('regions load all ../greg/regions/temp.reg')
-    print "Please verify the regions file falls entirely within the SDSS field."
+    print "Please verify the regions file falls entirely within the SDSS field. Do not close DS9! Just hit enter once you verify."
     ref = sys.stdin.readline()
     ds9.set('exit')
 
