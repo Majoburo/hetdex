@@ -16,16 +16,17 @@ if(os.getenv('FETCHSDSS')==None):
     os.environ['FETCHSDSS'] = os.environ['WORK']+"/fetchsdss"
 
 
+
 def photometry(pixCrd,sdss_fits_fname):
 
     '''
     Calling YODA to do photometry on the fibers.
     
     Parameters:
-        - A: pixel diameter of the fibers. Hetdex has fibers of 2.5 arsec, this converts in pixel space roughly to 5 pixels.
+        - A: pixel diameter of the fibers. Hetdex has fibers of 1.5 arsec, this converts in pixel space roughly to 4 pixels.
 
     '''
-    cmd = "$YODASRC/yoda -P --no-kron-ap -p imaging/image.phot -M %s -A 5  %s &> /dev/null" % (pixCrd,sdss_fits_fname)
+    cmd = "$YODASRC/yoda -P --no-kron-ap --sky-annulus [0,0] -p imaging/image.phot -M %s -A 5 %s  &> /dev/null"%(pixCrd,sdss_fits_fname)
     os.system(cmd)
 
     dssifu= get_txt_data('imaging/image.phot',[12,13])

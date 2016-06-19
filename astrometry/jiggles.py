@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import argparse
 import os.path as op
 import tools
+import integrate
 from scipy import interpolate
 from astropy import wcs
 from astropy.io import fits
@@ -51,7 +52,7 @@ def wcs2pix(fiber_ra,fiber_dec,fitsfile):
 
     return
 
-def zoom(positions,virus_flux,zooms=10):
+def zoom(positions,virus_flux,zooms=4):
 
     '''
     Routine to zoom in the jiggles.
@@ -60,9 +61,10 @@ def zoom(positions,virus_flux,zooms=10):
     for z in range(zooms):
 
         z=z+1
-        ddec=round(0.001000/z,6)
-        dra=round(0.001000/z,6)
+        ddec=round(0.000777*2/z,6)
+        dra=round(0.000171*2/z,6)*np.cos(ddec)
         chi2min = jiggle(positions,virus_flux,ddec,dra)
+        print chi2min[4:6]
         positions = np.array([chi2min[1],chi2min[2]])
 
     return chi2min
@@ -118,25 +120,29 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
     '''
     evirus_flux = np.ones(len(virus_flux)) #just to test, without errors
     #f, axarr = plt.subplots(5, 5)
-
     dectemp=dec0-ddec*steps/2 #min value of dec to scan
+    chi2s=np.zeros((steps,steps))
     for s1 in range(steps):
         ratemp=ra0-dra*steps/2 #min value of ra to scan
         for s2 in range(steps):
         #MAIN ROUTINE
-            #print "For %3.6f %2.6f:"%(ratemp[0]+dra,dectemp[0]+ddec)
-            wcs2pix(ratemp,dectemp,sdss_fits_fname) #converting ra and dec to pixels in sdss image for yoda input
             
-            #print "     Calculating photometry."
-            dssifu = tools.photometry(pixCrd,sdss_fits_fname)
-            dss_flux = dssifu[0]
-            edss_flux = dssifu[1]
+            #print "For %3.6f %2.6f:"%(ratemp[0]+dra,dectemp[0]+ddec)
+            #wcs2pix(ratemp,dectemp,sdss_fits_fname) #converting ra and dec to pixels in sdss image for yoda input
+            
+            #print "     Calculating photometry.
+            #print ratemp[0],dectemp[0]
+            dss_flux = integrate.get_flux(sdss_fits_fname,ratemp,dectemp,0.75,zoom_factor=4.0)
+            edss_flux = np.ones(len(dss_flux))
+            #dssifu = tools.photometry(pixCrd,sdss_fits_fname)
+            #dss_flux = dssifu[0]
+            #edss_flux = dssifu[1]
 
             #print ratemp[0],dectemp[0]        
             #print dss_flux.sum()
             #print virus_flux.sum()
             chi2 = findchi2(virus_flux,dss_flux,evifu=evirus_flux,edssifu=edss_flux)
-
+            chi2s[s1,s2] = chi2
             #np.savetxt('debug/jiggled_data_%s_%s.cat'%(s1,s2),map(list,zip(*[ratemp,dectemp])),fmt=['%3.6f','%2.6f'] )
             
             #print('chi2 = %f, virus_flux = %f,dss_flux= %f, s1=%d,s2=%d'%(chi2,virus_flux.sum(),dss_flux.sum(),s1,s2))
@@ -148,6 +154,7 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
             axarr[s1, s2].set_title('offset %d %d'%(s1,s2))
             axarr[s1, s2].axis(xmin=-0.1,xmax=0.1,ymax=0.5,ymin=-0.5)
             '''
+            
             ratemp=ratemp+dra #step in ra
         dectemp=dectemp+ddec #step in theta
     #plt.show()
@@ -155,6 +162,11 @@ def jiggle(positions,virus_flux,ddec=0.001000,dra=0.001000,steps = 5):
     #def linfun(x,a,b):
     #    return a+b*x
     #optimization.curve_fit(linfun, vifu, ifu,x0, sigma)
+    dss_flux = integrate.get_flux(sdss_fits_fname,chi2min[1],chi2min[2],0.75,zoom_factor=4.0)
+
+
+    plt.plot(chi2s)
+    plt.show()
     return chi2min
 
 def wavelenghtrange(hdulist):
@@ -237,23 +249,23 @@ def main():
     fitsfiles = args.fitsfiles
     print "Calculating wavelength range from virus files."
     wl = wavelenghtrange(fitsfiles[0])
-    
+
     print 'Weighting spectral data from IFU using sdss g filter and integrating over wavelenght range for each fiber...'
     data=[]
     data = [spectra for fitsfile in fitsfiles for spectra in fitsfile.data]
     wdata = weigthspectra(data,wl)
     virus_flux = [x.sum() for x in data]
-
+    np.savetxt('virusflux.txt',virus_flux)
     print 'Retrieving IFU position that were created by Greg\'s visualization_tool.py.'
 
     #Getting ifu positions for all the fibers in one ifu. The input file is created by greg's program.
-    positions = tools.get_txt_data(args.ifuPos,[0,1])
-
+    positions = np.array(tools.get_txt_data(args.ifuPos,[0,1]))
+    print positions
+    positions[0],positions[1]=positions[0]+0.0053840509754081722,positions[1]+0.00027915552097468321
     print 'Using fetchsdss to get image data from SDSS-III DR12.'
-    tools.getsdssimg(positions[0,0],positions[1,0])
-
+    #tools.getsdssimg(positions[0,0],positions[1,0])
     jiggled_data_min = zoom(positions,virus_flux)
-    
+
     print "RA is off by %3.6f"%(positions[0,0]-jiggled_data_min[1][0])
     print "DEC is off by %2.6f"%(positions[1,0]-jiggled_data_min[2][0])
     #print('Best fit is plot (%d,%d)'%(jiggled_data_min[4],jiggled_data_min[5]))
