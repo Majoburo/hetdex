@@ -21,8 +21,8 @@ gfilter = 'filters/g_sdss.dat'
 sdss_image = 'imaging/J134225.00+282357.0-g.fits'
 fwhm_vir  = 1.6  # DUMMY VALUE!!!
 fwhm_sdss = 1.53  # ARCSEC FWHM
-parangle = 255.976452  # HARCODED FROM FE FILE FOR NOW...
-#parangle = 256.054951
+#parangle = 255.976452  # HARCODED FROM FE FILE FOR NOW...
+parangle = 256.054951
 sigma = pow(fwhm_vir*fwhm_vir-fwhm_sdss*fwhm_sdss,0.5)*0.4247/3600
 
 
@@ -147,12 +147,12 @@ def crop(hdu,ifu_ra,ifu_dec):
     from astropy.nddata import Cutout2D
     from astropy.coordinates import SkyCoord
     c=SkyCoord(ifu_ra,ifu_dec, unit="deg")
-    size = (124*2, 124*2)     # cutting a box twice the size of the ifu
+    size = (124*2.5, 124*2.5)     # cutting a box twice the size of the ifu
     w=WCS('imaging/LsdssDR12g.fits')
     cutout = Cutout2D(hdu[0].data, c, size, wcs=w)
-    plt.imshow(hdu[0].data, origin='lower')
-    cutout.plot_on_original(color='white')
-    plt.show()
+    #plt.imshow(hdu[0].data, origin='lower')
+    #cutout.plot_on_original(color='white')
+    #plt.show()
     hdu = fits.PrimaryHDU(cutout.data,header=cutout.wcs.to_header()) #create new hdu
 
     return hdu
@@ -261,21 +261,32 @@ def main():
     ckern = cirkernel(1.89553)
     hdu[0].data = convolve2d(hdu[0].data,ckern,mode='same')
     ifu_cen=np.loadtxt('../greg/ifuPos.txt')
-    hdu = rotate(parangle,hdu)
-    sdsshdu=hdu
+    hdu = rotate(parangle, hdu)
+    sdsshdu = hdu
     k=0
+    output=open('positions.dat','w')
+    output.write('{0:14} {1:14} {2:14} \n'.format("#IFU","RA","DEC"))
     for ifu in ifu_cen:
         virusdata = virus_data[k]
         ifu_id,ifu_ra, ifu_dec = ifu[0],ifu[1],ifu[2]
-        hdu = crop(hdu,ifu_ra,ifu_dec)
+        hdu = crop(hdu, ifu_ra, ifu_dec)
 
         sdssimgcrop = hdu.data
-        sdssimg=(hdu.data<np.std(hdu.data)*sig)*hdu.data+(hdu.data>np.std(hdu.data)*sig)*hdu.data[hdu.data<np.std(hdu.data)*sig].mean()
+        
+        sdssimg = np.copy(sdssimgcrop)
 
-        virusdata = virusdata- virusdata.mean()
-        sdssimg =sdssimg - sdssimg.mean()
+        below_threshold = sdssimg<np.std(hdu.data)*sig
+        sdssimg_mean = sdssimg[below_threshold].mean()
+        sdssimg[np.logical_not(below_threshold)] = sdssimg_mean
+        
+        # sdssimg = (hdu.data<np.std(hdu.data)*sig)*hdu.data+(hdu.data>np.std(hdu.data)*sig)*hdu.data[hdu.data<np.std(hdu.data)*sig].mean()
 
-        corr = correlate2d(sdssimg,virusdata,boundary='symm',mode='same')
+        virusdata = virusdata - virusdata.mean()
+        sdssimg = sdssimg - sdssimg.mean()
+
+        corr = correlate2d(sdssimg, virusdata, boundary='symm', mode='same')
+        
+        #np.argsort(corr)
         y, x = np.unravel_index(np.argmax(corr), corr.shape)
         from astropy import wcs
         w = wcs.WCS(hdu.header)
@@ -284,18 +295,20 @@ def main():
         print(ra,dec)
         print('The offset is:')
         print(ra-ifu_ra,dec-ifu_dec)
-
         hdu.data=sdssimgcrop
         hdu.data[y,x]=0
-        for i in range(124):
-            hdu.data[y+124/2,x+i-124/2]=0
-            hdu.data[y-124/2,x+i-124/2]=0
-        for j in range(124):
-            hdu.data[y+j-124/2,x+124/2]=0
-            hdu.data[y+j-124/2,x-124/2]=0
+        if x > 124 and y > 124 and y < 248 and x < 248:
+            for i in range(124):
+                hdu.data[y+124/2,x+i-124/2]=0
+                hdu.data[y-124/2,x+i-124/2]=0
+            for j in range(124):
+                hdu.data[y+j-124/2,x+124/2]=0
+                hdu.data[y+j-124/2,x-124/2]=0
         hdu.writeto(('imaging/GBsdssDR12g%d.fits')%ifu_id,clobber =True)
         hdu = sdsshdu
         k += 1
+        output.write('{0:14} {1:14} {2:14} \n'.format(ifu_id,(ra-205.658155675)*3600,(dec-28.3641961267)*3600))
+    output.close()
 
 if __name__ == "__main__":
     main()
